@@ -63,8 +63,13 @@ if ($partes.Count -ne 2) {
 }
 $cabecalhoParam = $partes[0].TrimEnd()
 $corpoPrincipal = $partes[1]
-$corpoPrincipal = $corpoPrincipal -replace '(?m)^Import-Module.*$', ''
-$corpoPrincipal = $corpoPrincipal -replace '(?m)^\$pastaModulos\s*=.*$', ''
+$marcadorInicioImport = '# ---INICIO-IMPORT-MODULES--- (bloco inteiro removido por build\Build-Exe.ps1 no .exe compilado — as funções já vêm fundidas acima)'
+$marcadorFimImport = '# ---FIM-IMPORT-MODULES---'
+$padraoImport = [regex]::Escape($marcadorInicioImport) + '(?s).*?' + [regex]::Escape($marcadorFimImport)
+if ($corpoPrincipal -notmatch $padraoImport) {
+    throw "Marcadores de import-module não encontrados em $mainScript. Build cancelado para evitar um .exe malformado."
+}
+$corpoPrincipal = $corpoPrincipal -replace $padraoImport, ''
 
 $sb = New-Object System.Text.StringBuilder
 [void]$sb.AppendLine($cabecalhoParam)

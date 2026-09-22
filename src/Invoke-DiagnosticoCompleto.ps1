@@ -54,35 +54,67 @@ param(
     [switch]$PularEnergyReport,
     [switch]$AbrirRelatorio,
     [string]$PastaBase = (Join-Path ([Environment]::GetFolderPath('Desktop')) 'Relatório Monitor Sistema'),
-    [switch]$SemCompactar
+    [switch]$SemCompactar,
+    [switch]$SemPausar
 )
 # ---FIM-DO-PARAM--- (marcador usado por build\Build-Exe.ps1 — não remover)
 
 $ErrorActionPreference = 'Stop'
-$pastaModulos = Join-Path $PSScriptRoot 'Modules'
 
+# A partir daqui, TUDO roda dentro de um try/finally: se qualquer coisa falhar
+# (elevação, importação de módulo, erro inesperado), o erro é exibido de forma
+# legível e a janela SÓ fecha depois que o usuário apertar Enter. Sem isso, um
+# executável compilado (ps2exe) que falha cedo simplesmente "pisca e some", sem
+# dar nenhuma pista do que aconteceu — foi exatamente esse sintoma relatado em
+# campo quando o .exe não ficava elevado corretamente.
+try {
+
+# ---INICIO-IMPORT-MODULES--- (bloco inteiro removido por build\Build-Exe.ps1 no .exe compilado — as funções já vêm fundidas acima)
+$pastaModulos = Join-Path $PSScriptRoot 'Modules'
 Import-Module (Join-Path $pastaModulos 'Diag.Common.psm1') -Force
 Import-Module (Join-Path $pastaModulos 'Diag.Inventario.psm1') -Force
 Import-Module (Join-Path $pastaModulos 'Diag.Energia.psm1') -Force
 Import-Module (Join-Path $pastaModulos 'Diag.Monitor.psm1') -Force
 Import-Module (Join-Path $pastaModulos 'Diag.Eventos.psm1') -Force
 Import-Module (Join-Path $pastaModulos 'Diag.Relatorio.psm1') -Force
+# ---FIM-IMPORT-MODULES---
 
 # --- Elevação automática ---
 if (-not (Test-DiagIsAdmin)) {
-    Write-Host 'Este diagnóstico precisa de privilégios de Administrador (necessário para powercfg /energy e leitura completa de serviços).' -ForegroundColor Yellow
-    Write-Host 'Reabrindo com elevação...' -ForegroundColor Yellow
-    $argList = @('-NoExit', '-ExecutionPolicy', 'Bypass', '-File', "`"$PSCommandPath`"")
-    foreach ($key in $PSBoundParameters.Keys) {
-        $val = $PSBoundParameters[$key]
-        if ($val -is [switch]) {
-            if ($val.IsPresent) { $argList += "-$key" }
-        } else {
-            $argList += "-$key"; $argList += "$val"
+    # No .exe compilado (build\Build-Exe.ps1), o manifesto -requireAdmin já força
+    # o Windows a pedir elevação ANTES do processo iniciar — se chegamos aqui sem
+    # ser admin, é porque a elevação foi negada/cancelada. Um relançamento manual
+    # não é confiável nesse caso ($PSCommandPath não aponta para um arquivo .ps1
+    # real dentro de um .exe compilado), então apenas avisamos com clareza.
+    $scriptValido = $PSCommandPath -and (Test-Path -LiteralPath $PSCommandPath -ErrorAction SilentlyContinue) -and $PSCommandPath.ToLower().EndsWith('.ps1')
+
+    if ($scriptValido) {
+        Write-Host 'Este diagnóstico precisa de privilégios de Administrador.' -ForegroundColor Yellow
+        Write-Host 'Reabrindo com elevação...' -ForegroundColor Yellow
+        $argList = @('-NoExit', '-ExecutionPolicy', 'Bypass', '-File', "`"$PSCommandPath`"")
+        foreach ($key in $PSBoundParameters.Keys) {
+            $val = $PSBoundParameters[$key]
+            if ($val -is [switch]) {
+                if ($val.IsPresent) { $argList += "-$key" }
+            } else {
+                $argList += "-$key"; $argList += "$val"
+            }
         }
+        Start-Process -FilePath 'powershell.exe' -ArgumentList $argList -Verb RunAs
+        return
+    } else {
+        Write-Host ''
+        Write-Host '=====================================================================' -ForegroundColor Red
+        Write-Host ' ESTE DIAGNÓSTICO PRECISA SER EXECUTADO COMO ADMINISTRADOR.' -ForegroundColor Red
+        Write-Host ''
+        Write-Host ' A elevação (janela do Windows perguntando "Deseja permitir que este' -ForegroundColor Yellow
+        Write-Host ' aplicativo faça alterações...") não foi concedida. Clique com o' -ForegroundColor Yellow
+        Write-Host ' botão direito no MonitorSistema.exe e escolha "Executar como' -ForegroundColor Yellow
+        Write-Host ' administrador", e na janela do Controle de Conta de Usuário' -ForegroundColor Yellow
+        Write-Host ' clique em "Sim".' -ForegroundColor Yellow
+        Write-Host '=====================================================================' -ForegroundColor Red
+        return
     }
-    Start-Process -FilePath 'powershell.exe' -ArgumentList $argList -Verb RunAs
-    exit
 }
 
 # --- Preparação ---
@@ -237,4 +269,31 @@ if ($AbrirRelatorio) {
 }
 if ($caminhoZip) {
     Start-Process 'explorer.exe' -ArgumentList "/select,`"$caminhoZip`""
+}
+
+} catch {
+    Write-Host ''
+    Write-Host '=====================================================================' -ForegroundColor Red
+    Write-Host ' O DIAGNÓSTICO FOI INTERROMPIDO POR UM ERRO.' -ForegroundColor Red
+    Write-Host $_.Exception.Message -ForegroundColor Red
+    Write-Host ''
+    Write-Host $_.ScriptStackTrace -ForegroundColor DarkGray
+    Write-Host '=====================================================================' -ForegroundColor Red
+
+    try {
+        $pastaErro = [Environment]::GetFolderPath('Desktop')
+        $arquivoErro = Join-Path $pastaErro "MonitorSistema_erro_$(Get-Date -Format 'yyyy-MM-dd_HHmmss').txt"
+        @(
+            "Erro: $($_.Exception.Message)"
+            ''
+            'Stack:'
+            $_.ScriptStackTrace
+        ) | Out-File -FilePath $arquivoErro -Encoding UTF8
+        Write-Host "Detalhes salvos em: $arquivoErro" -ForegroundColor Yellow
+    } catch { }
+} finally {
+    if (-not $SemPausar) {
+        Write-Host ''
+        Read-Host 'Pressione Enter para fechar esta janela'
+    }
 }
