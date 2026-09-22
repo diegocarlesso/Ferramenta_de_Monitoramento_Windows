@@ -92,14 +92,18 @@ function Build-DiagSuspectScore {
     #>
     [CmdletBinding()]
     param(
-        [Parameter(Mandatory)] $Softwares,
-        [Parameter(Mandatory)] $Startup,
-        [Parameter(Mandatory)] $TarefasAgendadas,
-        [Parameter(Mandatory)] $ServicosRecentes,
-        [Parameter(Mandatory)] $ResumoMonitoramento,
-        [Parameter(Mandatory)] $EnergyReport,
-        [Parameter(Mandatory)] $PowerRequests,
-        [Parameter(Mandatory)] $ErrosAplicativos,
+        # AllowNull(): Get-DiagInstalledSoftware/Get-DiagStartupItems podem
+        # legitimamente devolver $null (nenhum item, sem @() na origem) — sem
+        # isso, a vinculação do parâmetro rejeitava $null e derrubava todo o
+        # cálculo de suspeitos numa máquina sem nada a reportar nessas listas.
+        [Parameter(Mandatory)][AllowNull()] $Softwares,
+        [Parameter(Mandatory)][AllowNull()] $Startup,
+        [Parameter(Mandatory)][AllowNull()] $TarefasAgendadas,
+        [Parameter(Mandatory)][AllowNull()] $ServicosRecentes,
+        [Parameter(Mandatory)][AllowNull()] $ResumoMonitoramento,
+        [Parameter(Mandatory)][AllowNull()] $EnergyReport,
+        [Parameter(Mandatory)][AllowNull()] $PowerRequests,
+        [Parameter(Mandatory)][AllowNull()] $ErrosAplicativos,
         [int]$DiasSoftwareRecente = 30
     )
 
@@ -220,10 +224,21 @@ function Build-DiagSuspectScore {
 
 function ConvertTo-DiagHtmlTable {
     param(
-        [Parameter(Mandatory)] $Dados,
+        [Parameter(Mandatory)][AllowNull()] $Dados,
         [string]$SemDadosTexto = 'Nenhum item encontrado.'
     )
-    if (-not $Dados -or @($Dados).Count -eq 0) {
+    # Evita o operador @() sobre $Dados: numa build recente do PowerShell 5.1,
+    # @() aplicado a um System.Collections.Generic.List<object> lança "Os
+    # tipos de argumento não correspondem" (reproduzido em campo — acontecia
+    # sempre que um chamador guardava uma List<object> dentro de uma
+    # propriedade, ex. Invoke-DiagPowerRequests, em vez de deixar o pipeline
+    # "desenrolar" a lista). foreach() enumera qualquer IEnumerable sem esse risco.
+    if (-not $Dados) {
+        return "<p class='vazio'>$SemDadosTexto</p>"
+    }
+    $temItens = $false
+    foreach ($item in $Dados) { $temItens = $true; break }
+    if (-not $temItens) {
         return "<p class='vazio'>$SemDadosTexto</p>"
     }
     $Dados | ConvertTo-Html -Fragment | Out-String
@@ -235,19 +250,24 @@ function New-DiagHtmlReport {
         [Parameter(Mandatory)][string]$CaminhoSaida,
         [Parameter(Mandatory)][string]$NomeMaquina,
         [Parameter(Mandatory)][datetime]$DataExecucao,
-        [Parameter(Mandatory)] $Suspeitos,
-        [Parameter(Mandatory)] $Bateria,
-        [Parameter(Mandatory)] $BatteryReportInfo,
-        [Parameter(Mandatory)] $EnergyReportInfo,
-        [Parameter(Mandatory)] $PowerRequests,
-        [Parameter(Mandatory)] $ResumoMonitoramento,
+        [Parameter(Mandatory)][AllowNull()] $Suspeitos,
+        [Parameter(Mandatory)][AllowNull()] $Bateria,
+        [Parameter(Mandatory)][AllowNull()] $BatteryReportInfo,
+        [Parameter(Mandatory)][AllowNull()] $EnergyReportInfo,
+        [Parameter(Mandatory)][AllowNull()] $PowerRequests,
+        [Parameter(Mandatory)][AllowNull()] $ResumoMonitoramento,
         [AllowNull()] $DrenoPorHora,
-        [Parameter(Mandatory)] $SoftwareRecente,
-        [Parameter(Mandatory)] $StartupRecente,
-        [Parameter(Mandatory)] $TarefasAgendadas,
-        [Parameter(Mandatory)] $ServicosRecentes,
-        [Parameter(Mandatory)] $EventosEnergia,
-        [Parameter(Mandatory)] $ErrosAplicativos,
+        # SoftwareRecente/StartupRecente/EventosEnergia legitimamente chegam
+        # $null quando não há nenhum item no período (Where-Object/pipeline
+        # sem resultado vira $null, não array vazio) — sem AllowNull() a
+        # vinculação do parâmetro rejeitava isso e derrubava o relatório
+        # inteiro exatamente numa máquina "limpa", sem nada suspeito.
+        [Parameter(Mandatory)][AllowNull()] $SoftwareRecente,
+        [Parameter(Mandatory)][AllowNull()] $StartupRecente,
+        [Parameter(Mandatory)][AllowNull()] $TarefasAgendadas,
+        [Parameter(Mandatory)][AllowNull()] $ServicosRecentes,
+        [Parameter(Mandatory)][AllowNull()] $EventosEnergia,
+        [Parameter(Mandatory)][AllowNull()] $ErrosAplicativos,
         [string]$DuracaoMonitoramentoTexto,
         [string]$PlanoEnergia
     )

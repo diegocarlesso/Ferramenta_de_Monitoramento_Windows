@@ -1,6 +1,9 @@
 # Relatórios gerados em execuções locais/teste
 Relatorios/
 
+# Dados reais enviados por clientes (sensíveis — nunca versionar)
+CLIENTE/
+
 # Artefatos de build (o .exe final vai nas Releases do GitHub, não no repo)
 dist/
 

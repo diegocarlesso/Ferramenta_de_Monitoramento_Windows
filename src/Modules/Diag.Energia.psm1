@@ -63,7 +63,12 @@ function Invoke-DiagPowerRequests {
         }
     }
     return [pscustomobject]@{
-        Itens      = $itens
+        # .ToArray(): guardado como propriedade de um objeto (não retornado
+        # diretamente), o pipeline não "desenrola" a List<object> num array
+        # comum — e o operador @() sobre List<object> lança "Os tipos de
+        # argumento não correspondem" numa build recente do PowerShell 5.1
+        # (reproduzido em campo). Um array .NET nativo não tem esse problema.
+        Itens      = $itens.ToArray()
         TextoBruto = $texto
     }
 }
