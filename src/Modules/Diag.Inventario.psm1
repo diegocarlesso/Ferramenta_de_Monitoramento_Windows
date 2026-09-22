@@ -60,9 +60,9 @@ function Get-DiagStartupItems {
         foreach ($prop in $props.PSObject.Properties) {
             if ($prop.Name -match '^PS(Path|ParentPath|ChildName|Provider)$') { continue }
             $exePath = ($prop.Value -replace '"', '') -split ' -' | Select-Object -First 1
-            $exePath = $exePath.Trim()
+            $exePath = if ($exePath) { $exePath.Trim() } else { '' }
             $criacao = $null
-            if (Test-Path -LiteralPath $exePath -ErrorAction SilentlyContinue) {
+            if ($exePath -and (Test-Path -LiteralPath $exePath -ErrorAction SilentlyContinue)) {
                 $criacao = (Get-Item -LiteralPath $exePath -ErrorAction SilentlyContinue).CreationTime
             }
             $resultado.Add([pscustomobject]@{
@@ -161,8 +161,8 @@ function Get-DiagServicosRecentes {
         $caminho = $s.PathName
         if (-not $caminho) { continue }
         $exePath = ($caminho -replace '"', '') -split ' -| /' | Select-Object -First 1
-        $exePath = $exePath.Trim()
-        if (-not (Test-Path -LiteralPath $exePath -ErrorAction SilentlyContinue)) { continue }
+        $exePath = if ($exePath) { $exePath.Trim() } else { '' }
+        if (-not $exePath -or -not (Test-Path -LiteralPath $exePath -ErrorAction SilentlyContinue)) { continue }
 
         $info = Get-Item -LiteralPath $exePath -ErrorAction SilentlyContinue
         if (-not $info) { continue }
