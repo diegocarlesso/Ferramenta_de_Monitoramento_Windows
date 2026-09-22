@@ -67,10 +67,20 @@ function Convert-DiagHtmlToPdf {
 
 function Get-DiagNomeBase {
     # Normaliza "chrome.exe" -> "chrome" e "svchost#2" -> "svchost" para cruzar
-    # processo (contador de desempenho) x software instalado.
+    # processo (contador de desempenho) x software instalado. Entradas vêm de
+    # dados reais (comandos de tarefas agendadas, PathName de serviços, nomes
+    # de provedor de eventos) que podem conter aspas ou caracteres inválidos
+    # de caminho (<, >, |) — GetFileNameWithoutExtension lança exceção nesses
+    # casos, então tratamos como "sem correspondência" em vez de derrubar todo
+    # o cálculo de suspeitos.
     param([string]$Texto)
     if (-not $Texto) { return '' }
-    $nome = ([IO.Path]::GetFileNameWithoutExtension($Texto)).ToLowerInvariant()
+    $textoLimpo = $Texto.Trim().Trim('"')
+    try {
+        $nome = ([IO.Path]::GetFileNameWithoutExtension($textoLimpo)).ToLowerInvariant()
+    } catch {
+        return ''
+    }
     return ($nome -replace '#\d+$', '')
 }
 
