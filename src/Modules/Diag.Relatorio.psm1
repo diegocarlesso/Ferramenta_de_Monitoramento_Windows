@@ -248,7 +248,8 @@ function New-DiagHtmlReport {
         [Parameter(Mandatory)] $ServicosRecentes,
         [Parameter(Mandatory)] $EventosEnergia,
         [Parameter(Mandatory)] $ErrosAplicativos,
-        [string]$DuracaoMonitoramentoTexto
+        [string]$DuracaoMonitoramentoTexto,
+        [string]$PlanoEnergia
     )
 
     $css = @'
@@ -288,7 +289,7 @@ a { color:#2563eb; }
     # ---- Resumo executivo ----
     [void]$sb.AppendLine('<section><h2>Resumo Executivo</h2>')
     $cargaTxt = if ($Bateria.Presente) { "$($Bateria.CargaPercentual)%" } else { 'N/D (desktop ou bateria não detectada)' }
-    $drenoTxt = if ($DrenoPorHora) { "$DrenoPorHora %/h" } else { 'N/D' }
+    $drenoTxt = if ($DrenoPorHora -ne $null) { "$DrenoPorHora %/h" } else { 'N/D' }
     $desgasteTxt = if ($BatteryReportInfo.DesgastePercentual -ne $null) { "$($BatteryReportInfo.DesgastePercentual)%" } else { 'N/D' }
 
     [void]$sb.AppendLine('<div class="kpis">')
@@ -318,9 +319,10 @@ a { color:#2563eb; }
     $rank = 0
     foreach ($s in $suspeitosExibidos) {
         $rank++
-        [void]$sb.AppendLine("<div class='suspeito'><span class='pontos'>Pontuação: $($s.Pontuacao)</span><h3>$rank. $($s.Nome)</h3><ul>")
+        $nomeSeguro = [System.Net.WebUtility]::HtmlEncode($s.Nome)
+        [void]$sb.AppendLine("<div class='suspeito'><span class='pontos'>Pontuação: $($s.Pontuacao)</span><h3>$rank. $nomeSeguro</h3><ul>")
         foreach ($ev in $s.Evidencias) {
-            [void]$sb.AppendLine("<li>$ev</li>")
+            [void]$sb.AppendLine("<li>$([System.Net.WebUtility]::HtmlEncode($ev))</li>")
         }
         [void]$sb.AppendLine('</ul></div>')
     }
@@ -343,9 +345,18 @@ a { color:#2563eb; }
 
     # ---- Energia ----
     [void]$sb.AppendLine('<section><h2>Diagnóstico de Energia (powercfg)</h2>')
-    [void]$sb.AppendLine("<p><strong>Plano de energia ativo:</strong> N/D — ver relatórios anexos</p>")
-    [void]$sb.AppendLine("<p><strong>Relatório powercfg /energy:</strong> $($EnergyReportInfo.Erros) erro(s), $($EnergyReportInfo.Avisos) aviso(s) — <a href='$([IO.Path]::GetFileName($EnergyReportInfo.CaminhoRelatorio))'>abrir relatório completo</a></p>")
-    [void]$sb.AppendLine("<p><strong>Relatório powercfg /batteryreport:</strong> <a href='$([IO.Path]::GetFileName($BatteryReportInfo.CaminhoRelatorio))'>abrir relatório completo</a></p>")
+    $planoTxt = if ($PlanoEnergia) { [System.Net.WebUtility]::HtmlEncode($PlanoEnergia) } else { 'N/D' }
+    [void]$sb.AppendLine("<p><strong>Plano de energia ativo:</strong> $planoTxt</p>")
+    if ($EnergyReportInfo.Gerado) {
+        [void]$sb.AppendLine("<p><strong>Relatório powercfg /energy:</strong> $($EnergyReportInfo.Erros) erro(s), $($EnergyReportInfo.Avisos) aviso(s) — <a href='$([IO.Path]::GetFileName($EnergyReportInfo.CaminhoRelatorio))'>abrir relatório completo</a></p>")
+    } else {
+        [void]$sb.AppendLine("<p><strong>Relatório powercfg /energy:</strong> não gerado nesta execução</p>")
+    }
+    if ($BatteryReportInfo.Gerado) {
+        [void]$sb.AppendLine("<p><strong>Relatório powercfg /batteryreport:</strong> <a href='$([IO.Path]::GetFileName($BatteryReportInfo.CaminhoRelatorio))'>abrir relatório completo</a></p>")
+    } else {
+        [void]$sb.AppendLine("<p><strong>Relatório powercfg /batteryreport:</strong> não gerado nesta execução</p>")
+    }
 
     [void]$sb.AppendLine('<h3 style="font-size:14px;margin-top:18px;">Processos impedindo suspensão do sistema (no momento da coleta)</h3>')
     [void]$sb.AppendLine((ConvertTo-DiagHtmlTable -Dados $PowerRequests.Itens -SemDadosTexto 'Nenhum processo está impedindo a suspensão do sistema no momento.'))

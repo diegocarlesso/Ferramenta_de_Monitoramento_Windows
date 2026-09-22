@@ -32,8 +32,6 @@ function Get-DiagInstalledSoftware {
                 RegistroChave   = $_.PSPath
             }
         } |
-        Sort-Object -Property @{Expression = 'DataInstalacao'; Descending = $true } -Unique |
-        Sort-Object Nome, DataInstalacao -Unique |
         Sort-Object -Property DataInstalacao -Descending
 }
 
@@ -58,7 +56,7 @@ function Get-DiagStartupItems {
         $props = Get-ItemProperty -Path $key -ErrorAction SilentlyContinue
         if (-not $props) { continue }
         foreach ($prop in $props.PSObject.Properties) {
-            if ($prop.Name -match '^PS(Path|ParentPath|ChildName|Provider)$') { continue }
+            if ($prop.Name -match '^PS(Path|ParentPath|ChildName|Provider|Drive)$') { continue }
             $exePath = ($prop.Value -replace '"', '') -split ' -' | Select-Object -First 1
             $exePath = if ($exePath) { $exePath.Trim() } else { '' }
             $criacao = $null

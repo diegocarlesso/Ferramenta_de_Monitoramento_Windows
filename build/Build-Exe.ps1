@@ -36,7 +36,12 @@ if (-not (Get-Module -ListAvailable -Name ps2exe)) {
 Import-Module ps2exe -Force
 
 # --- 2) Garante o ícone .ico (ps2exe exige .ico, não .png) ---
-if (-not (Test-Path $iconIco)) {
+# Regenera também se o .ico existir mas estiver desatualizado em relação ao
+# .png de origem — evita compilar com um ícone antigo silenciosamente.
+$icoDesatualizado = (Test-Path $iconIco) -and (Test-Path $iconPng) -and
+    ((Get-Item $iconPng).LastWriteTimeUtc -gt (Get-Item $iconIco).LastWriteTimeUtc)
+
+if (-not (Test-Path $iconIco) -or $icoDesatualizado) {
     if (-not (Test-Path $iconPng)) {
         throw "Ícone não encontrado em $iconPng. Coloque a imagem em src\assets\icon.png antes de compilar."
     }
@@ -55,7 +60,7 @@ if (-not (Test-Path $iconIco)) {
 New-Item -ItemType Directory -Path $PastaSaida -Force | Out-Null
 $mergedPath = Join-Path $PastaSaida 'MonitorSistema.merged.ps1'
 
-$principalBruto = Get-Content -Path $mainScript -Raw
+$principalBruto = Get-Content -Path $mainScript -Raw -Encoding UTF8
 $marcador = "# ---FIM-DO-PARAM--- (marcador usado por build\Build-Exe.ps1 — não remover)"
 $partes = $principalBruto -split [regex]::Escape($marcador), 2
 if ($partes.Count -ne 2) {
@@ -87,7 +92,7 @@ $modulos = @(
 )
 foreach ($m in $modulos) {
     $caminho = Join-Path $modulosDir $m
-    $conteudo = Get-Content -Path $caminho -Raw
+    $conteudo = Get-Content -Path $caminho -Raw -Encoding UTF8
     $conteudo = $conteudo -replace '(?m)^#Requires.*$', ''
     $conteudo = $conteudo -replace '(?m)^Export-ModuleMember.*$', ''
     [void]$sb.AppendLine("# ---- $m ----")

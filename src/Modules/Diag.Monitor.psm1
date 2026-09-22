@@ -37,8 +37,12 @@ function Start-DiagResourceMonitoring {
             $procs = Get-CimInstance -ClassName Win32_PerfFormattedData_PerfProc_Process -ErrorAction Stop |
                 Where-Object { $_.Name -ne '_Total' -and $_.Name -ne 'Idle' }
 
+            # Nome do processo entre aspas: alguns nomes de processo podem conter
+            # vírgulas (raro, mas possível em instâncias com nomes incomuns),
+            # o que corromperia o CSV e quebraria a leitura mais tarde.
             $linhas = foreach ($p in $procs) {
-                "$ts,$($p.Name),$($p.IDProcess),$($p.PercentProcessorTime),$($p.WorkingSetPrivate),$($p.IODataBytesPersec),$($p.HandleCount),$($p.ThreadCount)"
+                $nomeCsv = '"' + ($p.Name -replace '"', '""') + '"'
+                "$ts,$nomeCsv,$($p.IDProcess),$($p.PercentProcessorTime),$($p.WorkingSetPrivate),$($p.IODataBytesPersec),$($p.HandleCount),$($p.ThreadCount)"
             }
             $linhas | Out-File -FilePath $CsvSaida -Encoding UTF8 -Append
 
@@ -110,12 +114,12 @@ function Get-DiagMonitoringSummary {
     # Taxa de dreno de bateria (percentual por hora) no período monitorado
     $drenoPorHora = $null
     if (Test-Path $CsvBateria) {
-        $bat = Import-Csv -Path $CsvBateria | Where-Object { $_.NoCarregador -eq 'False' }
+        $bat = @(Import-Csv -Path $CsvBateria | Where-Object { $_.NoCarregador -eq 'False' })
         if ($bat.Count -ge 2) {
             $primeiro = $bat | Select-Object -First 1
             $ultimo = $bat | Select-Object -Last 1
-            $t1 = [DateTime]$primeiro.Timestamp
-            $t2 = [DateTime]$ultimo.Timestamp
+            $t1 = [DateTime]::ParseExact($primeiro.Timestamp, 'yyyy-MM-dd HH:mm:ss', [Globalization.CultureInfo]::InvariantCulture)
+            $t2 = [DateTime]::ParseExact($ultimo.Timestamp, 'yyyy-MM-dd HH:mm:ss', [Globalization.CultureInfo]::InvariantCulture)
             $horas = ($t2 - $t1).TotalHours
             if ($horas -gt 0) {
                 $quedaPercentual = [double]$primeiro.CargaPercentual - [double]$ultimo.CargaPercentual

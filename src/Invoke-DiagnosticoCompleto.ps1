@@ -172,6 +172,8 @@ if ($bateria.Presente) {
     Write-DiagLog 'Nenhuma bateria detectada (desktop?). Métricas de bateria ficarão vazias.' 'AVISO'
 }
 
+$planoEnergia = Get-DiagPowerScheme
+
 $energyReportInfo = [pscustomobject]@{ CaminhoRelatorio = ''; Gerado = $false; Erros = 0; Avisos = 0; TimersOfensores = @() }
 if (-not $PularEnergyReport) {
     Write-DiagLog 'Executando powercfg /energy (trace de 60s, aguarde)...' 'INFO'
@@ -241,7 +243,7 @@ New-DiagHtmlReport -CaminhoSaida $caminhoHtml -NomeMaquina $env:COMPUTERNAME -Da
     -Suspeitos $suspeitos -Bateria $bateria -BatteryReportInfo $batteryReportInfo -EnergyReportInfo $energyReportInfo `
     -PowerRequests $powerRequests -ResumoMonitoramento $resumoMonitoramento -DrenoPorHora $resumoMonitoramento.DrenoPorHora `
     -SoftwareRecente $softwareRecente -StartupRecente $startupRecente -TarefasAgendadas $tarefas -ServicosRecentes $servicos `
-    -EventosEnergia $eventosEnergia -ErrosAplicativos $errosApps -DuracaoMonitoramentoTexto $duracaoTexto
+    -EventosEnergia $eventosEnergia -ErrosAplicativos $errosApps -DuracaoMonitoramentoTexto $duracaoTexto -PlanoEnergia $planoEnergia
 
 Write-DiagLog "Relatório HTML gerado: $caminhoHtml" 'OK'
 
@@ -292,9 +294,10 @@ if ($caminhoZip) {
     Write-Host $_.ScriptStackTrace -ForegroundColor DarkGray
     Write-Host '=====================================================================' -ForegroundColor Red
 
+    $carimboErro = Get-Date -Format 'yyyy-MM-dd_HHmmss'
     try {
         $pastaErro = [Environment]::GetFolderPath('Desktop')
-        $arquivoErro = Join-Path $pastaErro "MonitorSistema_erro_$(Get-Date -Format 'yyyy-MM-dd_HHmmss').txt"
+        $arquivoErro = Join-Path $pastaErro "MonitorSistema_erro_$carimboErro.txt"
         @(
             "Erro: $($_.Exception.Message)"
             ''
@@ -302,6 +305,17 @@ if ($caminhoZip) {
             $_.ScriptStackTrace
         ) | Out-File -FilePath $arquivoErro -Encoding UTF8
         Write-Host "Detalhes salvos em: $arquivoErro" -ForegroundColor Yellow
+    } catch { }
+
+    # Mesmo em erro, os dados já coletados até aqui (CSVs parciais em raw\) têm
+    # valor para diagnosticar o problema — compacta o que existir para facilitar
+    # o envio, em vez de depender de prints de tela e acesso manual à pasta.
+    try {
+        if ($pastaSaida -and (Test-Path -LiteralPath $pastaSaida)) {
+            $zipErro = Join-Path $pastaErro "MonitorSistema_dados_parciais_$carimboErro.zip"
+            Compress-Archive -Path $pastaSaida -DestinationPath $zipErro -CompressionLevel Optimal -Force
+            Write-Host "Dados parciais compactados em: $zipErro" -ForegroundColor Yellow
+        }
     } catch { }
 } finally {
     if ($trayWatcher) {
