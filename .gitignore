@@ -1,0 +1,8 @@
+# Relatórios gerados em execuções locais/teste
+Relatorios/
+
+# Artefatos de build (o .exe final vai nas Releases do GitHub, não no repo)
+dist/
+
+# Diversos
+*.log
