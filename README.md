@@ -38,17 +38,32 @@ e dê duplo clique. O programa pede elevação (UAC) automaticamente.
 Os relatórios são salvos em:
 
 ```
-Área de Trabalho\Relatório Monitor Sistema\Diagnostico_<PC>_<data_hora>\
-    Relatorio.html
-    Relatorio.pdf
-    execucao.log
-    powercfg_energy.html
-    powercfg_batteryreport.html
-    raw\   (CSVs com todos os dados brutos coletados)
+Área de Trabalho\Relatório Monitor Sistema\
+    Diagnostico_<PC>_<data_hora>\
+        Relatorio.html
+        Relatorio.pdf
+        execucao.log
+        powercfg_energy.html
+        powercfg_batteryreport.html
+        raw\   (CSVs com todos os dados brutos coletados)
+    Diagnostico_<PC>_<data_hora>.zip   <- arquivo único para enviar à análise
 ```
 
-Por padrão, o monitoramento contínuo dura 30 minutos — use o notebook
-normalmente durante esse período para que a coleta capture o comportamento real.
+Ao final, a ferramenta compacta automaticamente toda a pasta em um `.zip` ao
+lado dela e abre o Explorer já selecionando o arquivo — é esse `.zip` que o
+cliente/usuário deve enviar para quem for analisar.
+
+### Quanto tempo de monitoramento é confiável?
+
+| Duração | Uso recomendado |
+|---|---|
+| 30 min (padrão) | Suficiente para sinais de CPU/memória e itens de inicialização |
+| **45–60 min, sem carregador** | Recomendado quando o sintoma é **dreno de bateria** — o Windows reporta a carga em passos de 1%, então janelas curtas produzem uma taxa de dreno pouco confiável |
+| 2 coletas em momentos diferentes | Se o relatório ficar inconclusivo, repita em outro período de uso (ex.: uma sessão leve, outra mais pesada) |
+
+Sempre rode com o notebook **desconectado do carregador** durante a janela de
+monitoramento — a taxa de dreno só é calculada sobre as amostras sem energia
+externa.
 
 ### Opção 2 — Script PowerShell (para desenvolvimento/ajustes)
 
@@ -66,6 +81,7 @@ Parâmetros úteis:
 | `-PularEnergyReport` | — | Pula o trace de 60s do `powercfg /energy` |
 | `-PastaBase` | `Área de Trabalho\Relatório Monitor Sistema` | Onde salvar os relatórios |
 | `-AbrirRelatorio` | — | Abre o relatório ao final |
+| `-SemCompactar` | — | Não gera o `.zip` final (útil em testes rápidos) |
 
 Execução rápida para validar a ferramenta (sem esperar 30 minutos):
 

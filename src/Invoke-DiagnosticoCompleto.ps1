@@ -35,6 +35,10 @@
     Pasta onde a subpasta do relatório será criada. Padrão: "Relatório Monitor
     Sistema" na Área de Trabalho do usuário atual.
 
+.PARAMETER SemCompactar
+    Não gera o .zip final com todos os relatórios (por padrão, um .zip é criado
+    ao lado da pasta de saída para facilitar o envio a quem for analisar).
+
 .EXAMPLE
     .\Invoke-DiagnosticoCompleto.ps1 -DuracaoMonitoramentoMinutos 45 -AbrirRelatorio
 
@@ -49,7 +53,8 @@ param(
     [int]$DiasSoftwareRecente = 30,
     [switch]$PularEnergyReport,
     [switch]$AbrirRelatorio,
-    [string]$PastaBase = (Join-Path ([Environment]::GetFolderPath('Desktop')) 'Relatório Monitor Sistema')
+    [string]$PastaBase = (Join-Path ([Environment]::GetFolderPath('Desktop')) 'Relatório Monitor Sistema'),
+    [switch]$SemCompactar
 )
 # ---FIM-DO-PARAM--- (marcador usado por build\Build-Exe.ps1 — não remover)
 
@@ -141,8 +146,11 @@ $csvProcessos = Join-Path $pastaRaw 'monitoramento_processos.csv'
 $csvBateria = Join-Path $pastaRaw 'monitoramento_bateria.csv'
 
 if ($DuracaoMonitoramentoMinutos -gt 0) {
+    if ($DuracaoMonitoramentoMinutos -lt 20) {
+        Write-DiagLog "Janela de monitoramento curta ($DuracaoMonitoramentoMinutos min). Para uma medição confiável do dreno de bateria, prefira 45-60 minutos sem o carregador, com uso normal do notebook." 'AVISO'
+    }
     Write-Host ''
-    Write-Host ">>> Use o notebook normalmente pelos próximos $DuracaoMonitoramentoMinutos minuto(s) (abra os apps que suspeita, navegue, etc). A coleta é silenciosa." -ForegroundColor Cyan
+    Write-Host ">>> Use o notebook normalmente pelos próximos $DuracaoMonitoramentoMinutos minuto(s) (abra os apps que suspeita, navegue, etc). Preferencialmente sem o carregador. A coleta é silenciosa." -ForegroundColor Cyan
     Write-Host ''
     Start-DiagResourceMonitoring -DuracaoMinutos $DuracaoMonitoramentoMinutos -IntervaloSegundos $IntervaloAmostragemSegundos -CsvSaida $csvProcessos -CsvBateria $csvBateria
 } else {
@@ -202,9 +210,31 @@ if ($pdfGerado) {
     Write-DiagLog 'PDF não pôde ser gerado — o relatório HTML continua disponível.' 'AVISO'
 }
 
+# --- 8) Compactação para envio ---
+$caminhoZip = $null
+if (-not $SemCompactar) {
+    Write-DiagLog 'Compactando relatórios em .zip para envio...' 'INFO'
+    $nomeZip = (Split-Path -Leaf $pastaSaida) + '.zip'
+    $caminhoZip = Join-Path $PastaBase $nomeZip
+    try {
+        if (Test-Path $caminhoZip) { Remove-Item -LiteralPath $caminhoZip -Force }
+        Compress-Archive -Path $pastaSaida -DestinationPath $caminhoZip -CompressionLevel Optimal -Force
+        Write-DiagLog "Arquivo .zip gerado: $caminhoZip" 'OK'
+    } catch {
+        Write-DiagLog "Falha ao compactar relatórios: $($_.Exception.Message)" 'AVISO'
+        $caminhoZip = $null
+    }
+}
+
 Write-Host ''
 Write-Host "=== Diagnóstico concluído. Relatórios em: $pastaSaida ===" -ForegroundColor Green
+if ($caminhoZip) {
+    Write-Host "=== Envie este arquivo único para análise: $caminhoZip ===" -ForegroundColor Green
+}
 
 if ($AbrirRelatorio) {
     if ($pdfGerado) { Start-Process $caminhoPdf } else { Start-Process $caminhoHtml }
+}
+if ($caminhoZip) {
+    Start-Process 'explorer.exe' -ArgumentList "/select,`"$caminhoZip`""
 }
