@@ -28,6 +28,10 @@ de agir, não apenas "sentir" que algo mudou.
 **A ferramenta é somente leitura**: não desinstala, não altera configurações e
 não finaliza processos. A decisão de remover algo é sempre do analista.
 
+Como o monitoramento roda por até 30–60 minutos, a janela pode ser minimizada
+para a bandeja do sistema (perto do relógio) em vez de ocupar a barra de
+tarefas — clique duas vezes no ícone para trazê-la de volta.
+
 ## Como usar
 
 ### Opção 1 — Executável (recomendado para o dia a dia)

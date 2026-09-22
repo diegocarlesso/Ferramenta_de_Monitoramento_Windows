@@ -77,6 +77,7 @@ Import-Module (Join-Path $pastaModulos 'Diag.Energia.psm1') -Force
 Import-Module (Join-Path $pastaModulos 'Diag.Monitor.psm1') -Force
 Import-Module (Join-Path $pastaModulos 'Diag.Eventos.psm1') -Force
 Import-Module (Join-Path $pastaModulos 'Diag.Relatorio.psm1') -Force
+Import-Module (Join-Path $pastaModulos 'Diag.Tray.psm1') -Force
 # ---FIM-IMPORT-MODULES---
 
 # --- Elevação automática ---
@@ -115,6 +116,17 @@ if (-not (Test-DiagIsAdmin)) {
         Write-Host '=====================================================================' -ForegroundColor Red
         return
     }
+}
+
+# --- Bandeja do sistema ---
+# Ao minimizar a janela do console, ela some da barra de tarefas e um ícone
+# de bandeja assume o lugar (clique duplo ou menu para restaurar). O
+# diagnóstico continua rodando normalmente enquanto minimizado.
+$trayWatcher = $null
+try {
+    $trayWatcher = Start-DiagTrayWatcher -TituloBandeja 'Monitor de Sistema - Diagnóstico em andamento'
+} catch {
+    # Bandeja é um recurso de conforto, não crítico — segue sem ela se falhar
 }
 
 # --- Preparação ---
@@ -292,6 +304,9 @@ if ($caminhoZip) {
         Write-Host "Detalhes salvos em: $arquivoErro" -ForegroundColor Yellow
     } catch { }
 } finally {
+    if ($trayWatcher) {
+        try { Stop-DiagTrayWatcher -Watcher $trayWatcher } catch { }
+    }
     if (-not $SemPausar) {
         Write-Host ''
         Read-Host 'Pressione Enter para fechar esta janela'

@@ -82,7 +82,8 @@ $modulos = @(
     'Diag.Energia.psm1',
     'Diag.Monitor.psm1',
     'Diag.Eventos.psm1',
-    'Diag.Relatorio.psm1'
+    'Diag.Relatorio.psm1',
+    'Diag.Tray.psm1'
 )
 foreach ($m in $modulos) {
     $caminho = Join-Path $modulosDir $m
